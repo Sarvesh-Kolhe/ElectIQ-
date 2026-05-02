@@ -1,0 +1,6 @@
+{
+  "name": "ElectIQ",
+  "description": "An AI-powered step-by-step guide for Indian voters. Personalized registration help, candidate tracking, and polling station navigation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["State-wise Schedules", "ECI Protocols", "Candidate Symbols"]
+}
