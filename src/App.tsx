@@ -38,10 +38,16 @@ import {
 } from './data/mockData';
 import { cn } from './lib/utils';
 import ElectionMap from './components/Map';
+import { Chatbot } from './components/Chatbot';
+
+import { useFirebase } from './contexts/FirebaseContext';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
 type Tab = 'overview' | 'registration' | 'candidates' | 'polling';
 
 export default function App() {
+  const { user, signIn, logout, profile } = useFirebase();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [selectedState, setSelectedState] = useState<string>('Maharashtra');
   const { scrollY } = useScroll();
@@ -118,25 +124,31 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            <a 
-              href="https://eci.gov.in/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              aria-label="ECI Documentation" 
-              className="hidden sm:flex text-sm font-medium text-foreground-muted hover:text-accent transition-colors px-4 py-2"
-            >
-              ECI Docs
-            </a>
-            <button 
-              onClick={() => {
-                const element = document.getElementById('lifecycle');
-                if (element) element.scrollIntoView({ behavior: 'smooth' });
-              }}
-              aria-label="Get Started" 
-              className="bg-accent text-white rounded-lg px-6 py-2.5 text-sm font-bold hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 active:scale-95 flex items-center gap-2"
-            >
-              Get Started <ChevronRight size={16} />
-            </button>
+            {user ? (
+              <div className="flex items-center gap-4">
+                <div className="hidden sm:flex flex-col items-end">
+                  <span className="text-xs font-bold text-foreground leading-none">{user.displayName}</span>
+                  <button 
+                    onClick={logout}
+                    className="text-[9px] font-bold text-accent uppercase tracking-widest hover:underline"
+                  >
+                    Logout
+                  </button>
+                </div>
+                <img 
+                  src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} 
+                  alt="Profile" 
+                  className="w-10 h-10 rounded-xl border border-accent/20 bg-accent/5 p-0.5"
+                />
+              </div>
+            ) : (
+              <button 
+                onClick={signIn}
+                className="bg-accent text-white rounded-lg px-6 py-2.5 text-sm font-bold hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 active:scale-95 flex items-center gap-2"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </nav>
       </header>
@@ -168,6 +180,7 @@ export default function App() {
           </button>
         ))}
       </footer>
+      <Chatbot />
     </div>
   );
 }
@@ -723,8 +736,9 @@ const FAQSection = React.memo(function FAQSection() {
 });
 
 const RegistrationView = React.memo(function RegistrationView() {
-  const [birthDate, setBirthDate] = useState<string>('');
-  const [isCalculated, setIsCalculated] = useState(false);
+  const { user, profile } = useFirebase();
+  const [birthDate, setBirthDate] = useState<string>(profile?.birthDate || '');
+  const [isCalculated, setIsCalculated] = useState(profile?.birthDate ? true : false);
   const [age, setAge] = useState<number | null>(null);
 
   const steps = [
@@ -733,7 +747,22 @@ const RegistrationView = React.memo(function RegistrationView() {
     { title: 'Protocol Execution', desc: 'Secure transmission of voter registration updates to ECI nodes.', icon: Radio },
   ];
 
-  const checkEligibility = () => {
+  useEffect(() => {
+    if (profile?.birthDate) {
+      setBirthDate(profile.birthDate);
+      const birth = new Date(profile.birthDate);
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        calculatedAge--;
+      }
+      setAge(calculatedAge);
+      setIsCalculated(true);
+    }
+  }, [profile?.birthDate]);
+
+  const checkEligibility = async () => {
     if (!birthDate) return;
     const birth = new Date(birthDate);
     const today = new Date();
@@ -744,6 +773,15 @@ const RegistrationView = React.memo(function RegistrationView() {
     }
     setAge(calculatedAge);
     setIsCalculated(true);
+
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        birthDate: birthDate,
+        isEligible: calculatedAge >= 18,
+        updatedAt: new Date()
+      });
+    }
   };
 
   const isEligible = age !== null && age >= 18;
@@ -994,11 +1032,22 @@ function CandidatesView({ selectedState }: { selectedState: string }) {
 }
 
 function PollingView({ selectedState }: { selectedState: string }) {
+  const { user, profile } = useFirebase();
   const [search, setSearch] = useState('');
   const [liveStatus, setLiveStatus] = useState('Live Link');
   const [stationActivity, setStationActivity] = useState<Record<string, number>>({});
   
   const filteredStations = MOCK_STATIONS.filter(s => s.state === selectedState);
+
+  const toggleSaveStation = async (stationId: string) => {
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    const isSaved = profile?.savedStations?.includes(stationId);
+    
+    await updateDoc(userRef, {
+      savedStations: isSaved ? arrayRemove(stationId) : arrayUnion(stationId)
+    });
+  };
 
   // Simulate real-time updates
   useEffect(() => {
@@ -1058,7 +1107,25 @@ function PollingView({ selectedState }: { selectedState: string }) {
             <SpotlightCard key={station.id} className="p-6 cursor-pointer group active:scale-[0.98]">
               <div className="flex justify-between items-start mb-2">
                 <h4 className="text-xl font-semibold tracking-tight text-foreground group-hover:text-accent transition-colors">{station.name}</h4>
-                <div className="text-[10px] font-mono font-bold bg-accent/10 text-accent px-3 py-1 rounded-lg border border-accent/20">{station.distance}</div>
+                <div className="flex items-center gap-2">
+                  {user && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSaveStation(station.id);
+                      }}
+                      className={cn(
+                        "p-2 rounded-lg transition-all",
+                        profile?.savedStations?.includes(station.id) 
+                          ? "bg-accent/20 text-accent" 
+                          : "bg-white/5 text-foreground-subtle hover:bg-white/10"
+                      )}
+                    >
+                      <TargetIcon size={14} className={profile?.savedStations?.includes(station.id) ? "fill-accent" : ""} />
+                    </button>
+                  )}
+                  <div className="text-[10px] font-mono font-bold bg-accent/10 text-accent px-3 py-1 rounded-lg border border-accent/20">{station.distance}</div>
+                </div>
               </div>
               
               {/* Activity indicator */}

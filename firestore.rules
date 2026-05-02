@@ -1,0 +1,84 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == 'sarveshkolhe14@gmail.com'; } // Bootstrapped admin
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // --- Collections ---
+
+    // Candidates: Public Read, Admin Write
+    match /candidates/{candidateId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidCandidate(incoming());
+    }
+
+    // Polling Stations: Public Read, Admin Write
+    match /polling_stations/{stationId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidPollingStation(incoming());
+    }
+
+    // Schedules: Public Read, Admin Write
+    match /schedules/{scheduleId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSchedule(incoming());
+    }
+
+    // Users: Owner Read/Write
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId); // Explicitly restrict list
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        // Action: Update Profile
+        (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'selectedState', 'birthDate', 'isEligible', 'savedStations', 'updatedAt']))
+      );
+      allow delete: if isOwner(userId);
+    }
+
+    // --- Validation Helpers ---
+
+    function isValidCandidate(data) {
+      return data.keys().hasAll(['name', 'party', 'state']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.party is string && data.party.size() <= 100 &&
+             data.state is string && data.state.size() <= 50;
+    }
+
+    function isValidPollingStation(data) {
+      return data.keys().hasAll(['name', 'address', 'state', 'lat', 'lng']) &&
+             data.name is string && data.name.size() <= 200 &&
+             data.address is string && data.address.size() <= 500 &&
+             data.state is string && data.state.size() <= 50 &&
+             data.lat is number && data.lng is number;
+    }
+
+    function isValidSchedule(data) {
+      return data.keys().hasAll(['state', 'phase', 'date', 'status']) &&
+             data.state is string && data.state.size() <= 50 &&
+             data.phase is string && data.phase.size() <= 50 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.status in ['upcoming', 'completed', 'ongoing'];
+    }
+
+    function isValidUser(data) {
+      return (data.keys().hasAny(['displayName']) ? data.displayName is string && data.displayName.size() <= 100 : true) &&
+             (data.keys().hasAny(['selectedState']) ? data.selectedState is string && data.selectedState.size() <= 50 : true) &&
+             (data.keys().hasAny(['birthDate']) ? data.birthDate is string && data.birthDate.size() <= 50 : true) &&
+             (data.keys().hasAny(['isEligible']) ? data.isEligible is bool : true) &&
+             (data.keys().hasAny(['savedStations']) ? data.savedStations is list && data.savedStations.size() <= 50 : true) &&
+             (data.keys().hasAny(['updatedAt']) ? data.updatedAt is timestamp : true);
+    }
+  }
+}

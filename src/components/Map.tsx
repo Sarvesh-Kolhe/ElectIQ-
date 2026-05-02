@@ -1,21 +1,13 @@
-import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { 
+  APIProvider, 
+  Map, 
+  AdvancedMarker, 
+  Pin,
+  InfoWindow
+} from '@vis.gl/react-google-maps';
+import { ExternalLink, Globe } from 'lucide-react';
 import { PollingStation } from '../data/mockData';
-
-// Fix for default marker icons in Leaflet with Vite/React
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-//@ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
 
 interface MapProps {
   stations: PollingStation[];
@@ -23,76 +15,99 @@ interface MapProps {
   activities?: Record<string, number>;
 }
 
-function ChangeView({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, 12);
-  }, [center, map]);
-  return null;
-}
-
 export default function ElectionMap({ stations, center, activities = {} }: MapProps) {
-  // Function to create custom animated marker icon
-  const createPulseIcon = (activity: number) => {
-    const size = 12 + (activity / 20); // Dynamic size based on activity
-    const opacity = 0.3 + (activity / 150);
-    
-    return L.divIcon({
-      className: 'custom-pulse-icon',
-      html: `
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-6 h-6 bg-accent rounded-full animate-ping opacity-20" style="animation-duration: ${3 - (activity / 50)}s"></div>
-          <div class="relative w-3 h-3 bg-accent rounded-full border-2 border-white shadow-[0_0_10px_rgba(94,106,210,0.8)]"></div>
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const [selectedStation, setSelectedStation] = useState<PollingStation | null>(null);
+
+  // If no API key is provided, show a helpful message
+  if (!apiKey) {
+    return (
+      <div className="w-full h-full bg-slate-100/50 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-8 text-center space-y-4 border-2 border-dashed border-slate-300">
+        <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center text-accent">
+          <Globe size={32} />
         </div>
-      `,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12]
-    });
-  };
+        <div className="space-y-2">
+          <h4 className="text-xl font-bold text-slate-800">Google Maps Integration</h4>
+          <p className="text-sm text-slate-500 max-w-sm">
+            To view the interactive polling station matrix, please configure your 
+            <code className="mx-1 px-1.5 py-0.5 bg-slate-200 rounded font-mono text-[10px]">VITE_GOOGLE_MAPS_API_KEY</code>
+            in the project settings.
+          </p>
+        </div>
+        <button 
+          onClick={() => window.open('https://console.cloud.google.com/google/maps-apis/overview', '_blank')}
+          className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 uppercase tracking-widest"
+        >
+          Get API Key <ExternalLink size={12} />
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <MapContainer 
-      center={center} 
-      zoom={12} 
-      className="w-full h-full"
-      zoomControl={false}
-    >
-      <ChangeView center={center} />
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-      />
-      {stations.map(station => {
-        const activity = activities[station.id] || 50;
-        return (
-          <Marker 
-              key={station.id} 
-              position={[station.lat, station.lng]}
-              icon={createPulseIcon(activity)}
-          >
-            <Popup>
-              <div className="p-2 min-w-[200px] bg-white text-slate-900 rounded-lg">
+    <APIProvider apiKey={apiKey}>
+      <div className="w-full h-full relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+        <Map
+          defaultCenter={{ lat: center[0], lng: center[1] }}
+          defaultZoom={12}
+          mapId="bf51a910020fa804" 
+          disableDefaultUI={true}
+          className="w-full h-full"
+        >
+          {stations.map((station) => {
+            const activity = activities[station.id] || 50;
+            return (
+              <AdvancedMarker
+                key={station.id}
+                position={{ lat: station.lat, lng: station.lng }}
+                onClick={() => setSelectedStation(station)}
+              >
+                <div className="relative group cursor-pointer">
+                  <div className="absolute -inset-4 bg-accent/20 rounded-full blur-xl group-hover:bg-accent/40 transition-all animate-pulse" />
+                  <Pin 
+                    background={'#5E6AD2'} 
+                    glyphColor={'#ffffff'} 
+                    borderColor={'#ffffff'}
+                    scale={1.2}
+                  />
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border border-white" />
+                </div>
+              </AdvancedMarker>
+            );
+          })}
+
+          {selectedStation && (
+            <InfoWindow
+              position={{ lat: selectedStation.lat, lng: selectedStation.lng }}
+              onCloseClick={() => setSelectedStation(null)}
+              headerDisabled={true}
+              className="custom-info-window"
+            >
+              <div className="p-1 min-w-[220px] bg-white text-slate-900 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-accent">{station.name}</h4>
-                  <div className="flex items-center gap-1.5">
+                  <h4 className="font-bold text-accent text-sm leading-tight">{selectedStation.name}</h4>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-4">
                     <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
                     <span className="text-[9px] font-mono font-bold text-accent uppercase tracking-tighter">Live</span>
                   </div>
                 </div>
-                <p className="text-[10px] mb-3 text-slate-500 leading-relaxed">{station.address}</p>
+                <p className="text-[10px] mb-3 text-slate-500 leading-relaxed font-medium">{selectedStation.address}</p>
                 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-slate-400">
                     <span>Node Activity</span>
-                    <span className="text-accent">{activity}%</span>
+                    <span className="text-accent">{activities[selectedStation.id] || 50}%</span>
                   </div>
                   <div className="w-full h-1 bg-black/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-accent transition-all duration-1000" style={{ width: `${activity}%` }} />
+                    <div 
+                      className="h-full bg-accent transition-all duration-1000" 
+                      style={{ width: `${activities[selectedStation.id] || 50}%` }} 
+                    />
                   </div>
                   
                   <div className="pt-2 border-t border-black/5">
                     <a 
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.name} ${station.address}`)}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedStation.name} ${selectedStation.address}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[9px] text-accent hover:underline flex items-center justify-center gap-1 font-bold uppercase tracking-widest"
@@ -102,10 +117,10 @@ export default function ElectionMap({ stations, center, activities = {} }: MapPr
                   </div>
                 </div>
               </div>
-            </Popup>
-          </Marker>
-        );
-      })}
-    </MapContainer>
+            </InfoWindow>
+          )}
+        </Map>
+      </div>
+    </APIProvider>
   );
 }

@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Candidate": {
+      "title": "Candidate",
+      "description": "Election candidate information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Candidate full name" },
+        "party": { "type": "string", "description": "Political party affiliation" },
+        "partySymbol": { "type": "string", "description": "Party symbol emoji/char" },
+        "role": { "type": "string", "description": "Political role" },
+        "avatar": { "type": "string", "description": "URL to avatar image" },
+        "vision": { "type": "string", "description": "Candidate's vision statement" },
+        "state": { "type": "string", "description": "State of candidacy" }
+      },
+      "required": ["name", "party", "state"]
+    },
+    "PollingStation": {
+      "title": "Polling Station",
+      "description": "Location and details of a polling station",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Station name" },
+        "address": { "type": "string", "description": "Full address" },
+        "hours": { "type": "string", "description": "Operating hours" },
+        "distance": { "type": "string", "description": "Distance from user (mock)" },
+        "state": { "type": "string", "description": "State where located" },
+        "lat": { "type": "number", "description": "Latitude" },
+        "lng": { "type": "number", "description": "Longitude" }
+      },
+      "required": ["name", "address", "state", "lat", "lng"]
+    },
+    "ElectionSchedule": {
+      "title": "Election Schedule",
+      "description": "Scheduled election date and metadata",
+      "type": "object",
+      "properties": {
+        "state": { "type": "string", "description": "State name" },
+        "phase": { "type": "string", "description": "Election phase" },
+        "date": { "type": "string", "description": "Formatted date" },
+        "label": { "type": "string", "description": "Election label" },
+        "status": { "type": "string", "enum": ["upcoming", "completed", "ongoing"] }
+      },
+      "required": ["state", "phase", "date", "status"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User preferences and registration status",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "selectedState": { "type": "string" },
+        "birthDate": { "type": "string", "description": "ISO date string" },
+        "isEligible": { "type": "boolean" },
+        "savedStations": { "type": "array", "description": "Array of polling station IDs" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/candidates/{candidateId}": {
+      "schema": "Candidate",
+      "description": "Global collection of candidates"
+    },
+    "/polling_stations/{stationId}": {
+      "schema": "PollingStation",
+      "description": "Global collection of polling stations"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": "ElectionSchedule",
+      "description": "Global collection of election schedules"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User-specific data"
+    }
+  }
+}
