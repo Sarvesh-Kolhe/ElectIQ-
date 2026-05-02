@@ -245,11 +245,11 @@ function OverviewView({ onTabChange, selectedState }: { onTabChange: (tab: Tab) 
           className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full border border-accent/10 bg-accent/5 text-accent text-xs font-bold tracking-wide uppercase shadow-sm"
         >
           <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-          AI-Powered Election Assistant — Made in India 🇮🇳
+          Digital Election Assistant — Made in India 🇮🇳
         </motion.div>
         
-          <h2 className="text-6xl md:text-8xl font-black tracking-tight leading-[1.05] text-slate-900" id="dashboard-heading">
-            Your <span className="text-accent">Personalized</span> <br /> Election Journey
+          <h2 className="text-6xl md:text-8xl font-black tracking-tight leading-[1.05] text-slate-900 font-display" id="dashboard-heading">
+            Your <span className="text-accent-gradient">Personalized</span> <br /> Election Journey
           </h2>
         
         <p className="text-foreground-muted text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
@@ -612,11 +612,117 @@ function OverviewView({ onTabChange, selectedState }: { onTabChange: (tab: Tab) 
           </SpotlightCard>
         </div>
       </section>
+
+      {/* FAQ Section */}
+      <FAQSection />
     </motion.div>
   );
 }
 
-function RegistrationView() {
+const FAQSection = React.memo(function FAQSection() {
+  const faqs = [
+    {
+      question: "How do I check if my name is in the electoral roll?",
+      answer: "You can check your name on the official NVSP portal (voters.eci.gov.in) using your EPIC number or personal details. Alternatively, you can use our EPIC Integration tool to quickly verify your presence in the latest database sync.",
+      icon: Search
+    },
+    {
+      question: "Can I vote without a physical Voter ID card?",
+      answer: "Yes! If your name is in the electoral roll, you can cast your vote using alternative identity documents approved by the ECI, such as Aadhaar Card, PAN Card, Driving License, or Bank Passbook with a photograph.",
+      icon: ShieldCheck
+    },
+    {
+      question: "Where can I see the criminal history of candidates in my area?",
+      answer: "ECI mandates all candidates to publish their 'KYC' (Know Your Candidate) information. You can find detailed affidavits (Form 26) through our Candidates section, the ECI website, or the KYC mobile app.",
+      icon: Gavel
+    },
+    {
+      question: "Are Electronic Voting Machines (EVMs) tamper-proof?",
+      answer: "EVMs are standalone machines (M3 version) that are not connected to any network (Internet, Wi-Fi, or Bluetooth). They are also complemented by VVPAT (Voter Verifiable Paper Audit Trail) which allows you to visually audit your vote.",
+      icon: Cpu
+    }
+  ];
+
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  return (
+    <section className="space-y-12 py-12 border-t border-white/5 scroll-mt-24" id="faq">
+      <div className="text-center space-y-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-[10px] font-bold uppercase tracking-widest">
+          Knowledge Base
+        </div>
+        <h3 className="text-4xl font-semibold tracking-tight">Hacker's Guide to <span className="text-accent-gradient">Democracy</span></h3>
+        <p className="text-foreground-muted max-w-xl mx-auto">Common queries regarding the electoral process, protocols, and security measures in the Indian context.</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+        {faqs.map((faq, i) => (
+          <SpotlightCard 
+            key={i} 
+            className={cn(
+              "p-8 transition-all duration-300",
+              openIndex === i ? "border-accent/40 bg-accent/[0.02]" : "border-white/5"
+            )}
+          >
+            <button 
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              className="w-full text-left space-y-4"
+              aria-expanded={openIndex === i}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all",
+                    openIndex === i ? "bg-accent text-white" : "bg-white/5 text-accent"
+                  )}>
+                    <faq.icon size={20} />
+                  </div>
+                  <h4 className="text-lg font-bold tracking-tight leading-tight">{faq.question}</h4>
+                </div>
+                <div className={cn(
+                  "mt-2 transition-transform duration-300",
+                  openIndex === i ? "rotate-45" : "rotate-0"
+                )}>
+                  <ChevronRight size={20} className="text-foreground-muted" />
+                </div>
+              </div>
+              
+              <AnimatePresence>
+                {openIndex === i && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <p className="text-foreground-muted leading-relaxed pt-2 border-t border-white/5">
+                      {faq.answer}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </button>
+          </SpotlightCard>
+        ))}
+      </div>
+
+      <div className="text-center pt-8">
+        <p className="text-sm text-foreground-subtle mb-6">Didn't find what you were looking for?</p>
+        <a 
+          href="https://eci.gov.in/faqs/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-accent font-bold hover:underline"
+        >
+          View All ECI FAQs <ExternalLink size={16} />
+        </a>
+      </div>
+    </section>
+  );
+});
+
+const RegistrationView = React.memo(function RegistrationView() {
   const [birthDate, setBirthDate] = useState<string>('');
   const [isCalculated, setIsCalculated] = useState(false);
   const [age, setAge] = useState<number | null>(null);
@@ -651,7 +757,7 @@ function RegistrationView() {
       className="max-w-5xl mx-auto space-y-24"
     >
       <div className="text-center space-y-6">
-        <h2 className="text-5xl md:text-7xl font-semibold tracking-tight text-gradient">EPIC <span className="text-accent-gradient">Integration</span></h2>
+        <h2 className="text-5xl md:text-7xl font-semibold tracking-tight text-gradient font-display">EPIC <span className="text-accent-gradient">Integration</span></h2>
         <p className="text-foreground-muted text-xl max-w-2xl mx-auto leading-relaxed">
           The national standard for voter registration. Follow the encrypted protocol to establish your democratic footprint.
         </p>
@@ -678,6 +784,7 @@ function RegistrationView() {
                   <input 
                     type="date"
                     value={birthDate}
+                    aria-label="Date of Birth"
                     onChange={(e) => {
                       setBirthDate(e.target.value);
                       setIsCalculated(false);
@@ -687,6 +794,7 @@ function RegistrationView() {
                 </div>
                 <button 
                   onClick={checkEligibility}
+                  aria-label="Verify Age Eligibility"
                   className="w-full bg-accent text-white py-4 rounded-2xl font-bold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                   Verify Legal Age <ArrowRight size={18} />
@@ -810,7 +918,7 @@ function RegistrationView() {
       </section>
     </motion.div>
   );
-}
+});
 
 
 function CandidatesView({ selectedState }: { selectedState: string }) {
